@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kinetic Check</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: one phone-width column that reads like a yardage book. Every measurement sits on a ruler with the pro band marked. */
+:root{
+  --bg:#EDF1ED; --surface:#FFFFFF; --ink:#0F1F1A; --muted:#586A62; --line:#D2DAD4;
+  --brand:#17503C; --accent:#E24A14;
+  --good:#1B8A55; --warn:#B27808; --bad:#C63333;
+  --band:rgba(23,80,60,.16);
+  --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0B1411; --surface:#13201B; --ink:#E7EEE9; --muted:#94A49C; --line:#27382F;
+    --brand:#73D2A9; --accent:#FF7B47;
+    --good:#4CC98B; --warn:#E3AC3A; --bad:#F27070;
+    --band:rgba(115,210,169,.18);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0B1411; --surface:#13201B; --ink:#E7EEE9; --muted:#94A49C; --line:#27382F;
+  --brand:#73D2A9; --accent:#FF7B47;
+  --good:#4CC98B; --warn:#E3AC3A; --bad:#F27070;
+  --band:rgba(115,210,169,.18);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
+.wrap{max-width:680px;margin:0 auto;padding:0 16px 56px;display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;letter-spacing:.01em;text-transform:uppercase;line-height:1}
+h2{font-size:26px;font-weight:800}
+h3{font-size:19px;font-weight:600;letter-spacing:.03em}
+p{margin:0}
+a{color:var(--brand)}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+.top{display:flex;flex-direction:column;gap:12px;padding:18px 0 0}
+.mark{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.mark h1{font-size:44px;font-weight:800}
+.mark h1 span{color:var(--accent)}
+.mark p{color:var(--muted);font-size:14px}
+nav{display:flex;gap:6px;border-bottom:2px solid var(--ink)}
+nav a{font-family:var(--display);font-weight:600;font-size:16px;text-transform:uppercase;letter-spacing:.03em;text-decoration:none;color:var(--muted);padding:8px 10px;white-space:nowrap;border-radius:6px 6px 0 0}
+nav a[aria-current="page"]{background:var(--ink);color:var(--bg)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:14px}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.field{display:flex;flex-direction:column;gap:6px}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label{flex:1 1 auto;text-align:center;padding:10px 12px;border:1.5px solid var(--line);border-radius:8px;font-weight:500;cursor:pointer;min-width:84px}
+.seg input:checked+label{border-color:var(--brand);background:var(--brand);color:var(--surface)}
+.seg input:focus-visible+label{outline:3px solid var(--accent);outline-offset:2px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+select{background:var(--surface);border:1.5px solid var(--line);border-radius:8px;padding:9px 10px}
+.tips{margin:0;padding-left:18px;color:var(--muted);font-size:14.5px;display:flex;flex-direction:column;gap:4px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 16px;border-radius:8px;border:1.5px solid var(--ink);background:transparent;font-weight:600;cursor:pointer;text-align:center;flex:1 1 150px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.small{flex:0 0 auto;padding:8px 12px;font-size:14px}
+.filebtn{position:relative;overflow:hidden}
+.filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.note{font-size:13.5px;color:var(--muted)}
+.alert{border-left:4px solid var(--bad);background:var(--surface);padding:12px 14px;border-radius:6px;font-size:15px}
+[hidden]{display:none!important}
+
+.stage{position:relative;background:#000;border-radius:10px;overflow:hidden;display:flex;justify-content:center}
+.stage canvas{max-width:100%;max-height:62vh;display:block}
+.bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .15s linear}
+
+.scorehead{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.score{font-family:var(--display);font-weight:800;font-size:92px;line-height:.82;font-variant-numeric:tabular-nums}
+.score small{font-size:26px;color:var(--muted);font-weight:600}
+.scoremeta{display:flex;flex-direction:column;gap:6px;flex:1 1 180px}
+.tag{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:4px;border:1.5px dashed var(--accent);color:var(--accent);align-self:flex-start}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:12.5px;border:1px solid var(--line);border-radius:999px;padding:3px 9px;color:var(--muted)}
+
+.prio{display:flex;flex-direction:column;gap:12px;counter-reset:p}
+.prio article{border:1px solid var(--line);border-left:5px solid var(--bad);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;background:var(--surface)}
+.prio article.near{border-left-color:var(--warn)}
+.prio h3::before{counter-increment:p;content:counter(p) ". ";color:var(--accent)}
+.prio .num{font-size:14px;color:var(--muted)}
+.prio ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:15px}
+.prio b{font-weight:600}
+
+.metrics{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.metrics li{border-top:1px solid var(--line)}
+.metrics li:first-child{border-top:0}
+.metrics summary{list-style:none;cursor:pointer;padding:12px 0;display:flex;flex-direction:column;gap:7px}
+.metrics summary::-webkit-details-marker{display:none}
+.mh{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.mh .n{font-weight:600}
+.mh .v{font-family:var(--display);font-weight:800;font-size:21px;font-variant-numeric:tabular-nums;text-align:right}
+.ruler{position:relative;height:16px;border-radius:3px;background:
+  repeating-linear-gradient(90deg,var(--line) 0 1px,transparent 1px 10%) ,var(--bg);border:1px solid var(--line)}
+.ruler .band{position:absolute;top:0;bottom:0;background:var(--band);border-left:2px solid var(--brand);border-right:2px solid var(--brand)}
+.ruler .dot{position:absolute;top:-4px;bottom:-4px;width:5px;margin-left:-2.5px;border-radius:2px;background:var(--ink)}
+.mf{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:var(--muted);align-items:center}
+.pill{font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;border:1.5px solid currentColor;white-space:nowrap}
+.st-good .pill{color:var(--good)} .st-near .pill{color:var(--warn)} .st-bad .pill{color:var(--bad)}
+.st-good .dot{background:var(--good)} .st-near .dot{background:var(--warn)} .st-bad .dot{background:var(--bad)}
+.more{padding:0 0 14px;font-size:14.5px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+
+.thumbs{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
+.thumbs button{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:0;overflow:hidden;cursor:pointer;display:flex;flex-direction:column}
+.thumbs img{width:100%;display:block;background:#000}
+.thumbs span{font-size:12.5px;font-weight:600;padding:5px 6px;text-align:left}
+input[type=range]{width:100%;accent-color:var(--accent)}
+
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+.scroll{overflow-x:auto}
+th,td{text-align:left;padding:8px 10px 8px 0;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
+.src{font-size:13px;color:var(--muted)}
+.hist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.hist li{display:flex;justify-content:space-between;gap:10px;align-items:center;border-top:1px solid var(--line);padding:10px 0}
+.hist li:first-child{border-top:0}
+.hist .s{font-family:var(--display);font-weight:800;font-size:28px;font-variant-numeric:tabular-nums}
+#src{position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none}
+@media (prefers-reduced-motion: reduce){.bar i{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="mark">
+      <h1>Kinetic<span>/</span>Check</h1>
+      <p>Film a swing or a pitch. Get your numbers next to the pros'.</p>
+    </div>
+    <nav aria-label="Sections">
+      <a href="#analyze" data-tab="analyze">Analyze</a>
+      <a href="#pro-numbers" data-tab="pro-numbers">Pro numbers</a>
+      <a href="#history" data-tab="history">History</a>
+    </nav>
+  </header>
+
+  <main id="view-analyze" class="wrap" style="padding:0">
+    <section class="card" aria-labelledby="setup-h">
+      <h2 id="setup-h">Set up the shot</h2>
+      <div class="field"><span class="eyebrow">Sport</span>
+        <div class="seg">
+          <input type="radio" name="sport" id="sport-golf" value="golf" checked><label for="sport-golf">Golf swing</label>
+          <input type="radio" name="sport" id="sport-pitch" value="pitch"><label for="sport-pitch">Pitching delivery</label>
+        </div>
+      </div>
+      <div class="field" id="f-club"><span class="eyebrow">Club</span>
+        <div class="seg">
+          <input type="radio" name="club" id="club-iron" value="iron" checked><label for="club-iron">Iron</label>
+          <input type="radio" name="club" id="club-driver" value="driver"><label for="club-driver">Driver</label>
+        </div>
+      </div>
+      <div class="field"><span class="eyebrow">Camera angle</span>
+        <div class="seg" id="seg-view"></div>
+      </div>
+      <div class="row">
+        <div class="field" style="flex:1 1 150px"><span class="eyebrow" id="hand-lbl">Swings</span>
+          <div class="seg">
+            <input type="radio" name="hand" id="hand-r" value="R" checked><label for="hand-r">Right</label>
+            <input type="radio" name="hand" id="hand-l" value="L"><label for="hand-l">Left</label>
+          </div>
+        </div>
+        <div class="field"><label class="eyebrow" for="h-ft">Height</label>
+          <div class="row">
+            <select id="h-ft" aria-label="Feet"></select>
+            <select id="h-in" aria-label="Inches"></select>
+          </div>
+        </div>
+      </div>
+      <div class="field"><span class="eyebrow">Where to put the phone</span>
+        <ul class="tips" id="cam-tips"></ul>
+      </div>
+      <div class="row">
+        <label class="btn primary filebtn">Record with camera<input type="file" id="file-rec" accept="video/*" capture="environment"></label>
+        <label class="btn filebtn">Choose a video<input type="file" id="file-pick" accept="video/*"></label>
+      </div>
+      <p class="note" id="trk" aria-live="polite">Body tracker: loading.</p>
+      <p class="note">Video stays on your phone. Nothing is uploaded.</p>
+    </section>
+
+    <div class="alert" id="alert" role="alert" hidden></div>
+
+    <section class="card" id="progress" hidden aria-live="polite">
+      <h2>Reading your motion</h2>
+      <div class="stage"><canvas id="live" width="360" height="640"></canvas></div>
+      <div class="bar"><i id="bar"></i></div>
+      <p class="note" id="prog-txt">Loading the body tracker.</p>
+    </section>
+
+    <div id="report" class="wrap" style="padding:0"></div>
+  </main>
+
+  <main id="view-pro-numbers" class="wrap" style="padding:0" hidden></main>
+
+  <main id="view-history" class="wrap" style="padding:0" hidden>
+    <section class="card">
+      <h2>Your sessions</h2>
+      <p class="note">Saved in this browser only. Clearing site data removes them.</p>
+      <ul class="hist" id="hist"></ul>
+      <div class="row"><button class="btn small" id="hist-clear" type="button">Clear history</button></div>
+    </section>
+  </main>
+</div>
+
+<video id="src" muted playsinline preload="auto"></video>
+
+
+<script id="engine">
+/* ---------- Analysis engine: pure functions, no DOM ---------- */
+(function(root){
+"use strict";
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const deg=r=>r*180/Math.PI;
+const mid=(a,b)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
+const d2=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+const SIDE={L:{sh:11,el:13,wr:15,hip:23,kn:25,an:27,ear:7},R:{sh:12,el:14,wr:16,hip:24,kn:26,an:28,ear:8}};
+function med(a){const b=a.filter(v=>Number.isFinite(v)).sort((x,y)=>x-y);if(!b.length)return NaN;const m=b.length>>1;return b.length%2?b[m]:(b[m-1]+b[m])/2;}
+function fail(code){const e=new Error(code);e.code=code;return e;}
+function ang2(a,b,c){const ux=a.x-b.x,uy=a.y-b.y,vx=c.x-b.x,vy=c.y-b.y;const m=Math.hypot(ux,uy)*Math.hypot(vx,vy);return m?deg(Math.acos(clamp((ux*vx+uy*vy)/m,-1,1))):NaN;}
+function ang3(a,b,c){const u=[a.x-b.x,a.y-b.y,a.z-b.z],v=[c.x-b.x,c.y-b.y,c.z-b.z];const m=Math.hypot(...u)*Math.hypot(...v);return m?deg(Math.acos(clamp((u[0]*v[0]+u[1]*v[1]+u[2]*v[2])/m,-1,1))):NaN;}
+const joint=(f,a,b,c)=>f.w?ang3(f.w[a],f.w[b],f.w[c]):ang2(f.lm[a],f.lm[b],f.lm[c]);
+const hv=(f,a,b)=>f.w?{x:f.w[a].x-f.w[b].x,z:f.w[a].z-f.w[b].z}:null;
+const yawBetween=(r,v)=>(!r||!v)?NaN:deg(Math.atan2(r.x*v.z-r.z*v.x,r.x*v.x+r.z*v.z));
+function tilt3(f,a,b){if(!f.w)return NaN;const x=f.w[a].x-f.w[b].x,y=f.w[a].y-f.w[b].y,z=f.w[a].z-f.w[b].z;return deg(Math.atan2(y,Math.hypot(x,z)));}
+const shMid=f=>mid(f.lm[11],f.lm[12]), hipMid=f=>mid(f.lm[23],f.lm[24]), head=f=>mid(f.lm[7],f.lm[8]), hands=f=>mid(f.lm[15],f.lm[16]);
+const lean=f=>{const s=shMid(f),h=hipMid(f);return deg(Math.atan2(s.x-h.x,h.y-s.y));};
+function near(frames,i,span,fn){const t=frames[i].t,o=[];for(let k=0;k<frames.length;k++){if(Math.abs(frames[k].t-t)<=span)o.push(fn(frames[k]));}return med(o);}
+function nearPt(frames,i,span,fn){return {x:near(frames,i,span,f=>fn(f).x),y:near(frames,i,span,f=>fn(f).y)};}
+function refVec(frames,i,span,a,b){let x=0,z=0,n=0;const t=frames[i].t;for(const f of frames){if(Math.abs(f.t-t)<=span&&f.w){const v=hv(f,a,b);x+=v.x;z+=v.z;n++;}}return n?{x:x/n,z:z/n}:null;}
+/* speed of a point in units per second, measured across at least 30 ms each side so repeated frames do not spike */
+function speeds(frames,pts,unit){const n=frames.length,v=new Array(n).fill(0);
+  for(let i=0;i<n;i++){let j=i,k=i;while(j>0&&frames[i].t-frames[j].t<0.03)j--;while(k<n-1&&frames[k].t-frames[i].t<0.03)k++;const dt=frames[k].t-frames[j].t;v[i]=dt>0?d2(pts[k],pts[j])/dt/unit:0;}
+  const s=v.slice();for(let i=1;i<n-1;i++)s[i]=med([v[i-1],v[i],v[i+1]]);return s;}
+function argBest(n,ok,val,min){let b=-1,bv=min?Infinity:-Infinity;for(let i=0;i<n;i++){if(!ok(i))continue;const x=val(i);if(min?x<bv:x>bv){bv=x;b=i;}}return b;}
+
+/* Fast pass helper for the app: when does the key body part move fastest? */
+function peakTime(frames,cfg){frames=frames.filter(f=>f&&f.lm);if(frames.length<8)return null;
+  const unit=med(frames.map(f=>d2(shMid(f),hipMid(f))));const pts=cfg.sport==='golf'?frames.map(hands):frames.map(f=>f.lm[SIDE[cfg.hand].wr]);
+  const v=speeds(frames,pts,unit);const i=argBest(frames.length,()=>true,k=>v[k]);return i<0?null:frames[i].t;}
+
+function golfPhases(frames,unit){
+  const n=frames.length,H=frames.map(hands),v=speeds(frames,H,unit);
+  const iPk=argBest(n,()=>true,i=>v[i]);
+  if(iPk<0||v[iPk]<2.2)throw fail('nomotion');
+  const tPk=frames[iPk].t;
+  const iTop=argBest(n,i=>frames[i].t>=tPk-1.7&&frames[i].t<=tPk-0.04,i=>H[i].y,true);
+  if(iTop<0)throw fail('nomotion');
+  const thr=Math.max(0.35,0.05*v[iPk]);let iAd=-1,first=iTop;
+  let moving=false;
+  for(let i=iTop-1;i>=0&&frames[iTop].t-frames[i].t<=2.6;i--){first=i;if(!moving){if(v[i]>=2*thr)moving=true;continue;}
+    if(v[i]<thr&&(i<1||v[i-1]<thr)&&(i<2||v[i-2]<thr)){iAd=i;break;}}
+  if(iAd<0)iAd=first;
+  const half=H[iTop].y+0.5*(H[iAd].y-H[iTop].y);
+  let iImp=argBest(n,i=>i>iTop&&frames[i].t-frames[iTop].t<=0.9&&H[i].y>=half,i=>d2(H[i],H[iAd]),true);
+  if(iImp<0)iImp=Math.min(n-1,iPk);
+  let iFin=argBest(n,i=>frames[i].t>=frames[iImp].t+0.25&&frames[i].t<=frames[iImp].t+1.6,i=>H[i].y,true);
+  if(iFin<0)iFin=n-1;
+  return {addr:iAd,top:iTop,impact:iImp,finish:iFin,back:frames[iTop].t-frames[iAd].t,down:frames[iImp].t-frames[iTop].t};
+}
+function crossX(frames,H,i0,i1,y){for(let i=i0;i<i1;i++){const a=H[i],b=H[i+1];if((a.y-y)*(b.y-y)<=0&&a.y!==b.y){const u=(y-a.y)/(b.y-a.y);return a.x+u*(b.x-a.x);}}return NaN;}
+
+function analyzeGolf(frames,cfg){
+  const lead=SIDE[cfg.hand==='R'?'L':'R'],trail=SIDE[cfg.hand==='R'?'R':'L'];
+  const unit=med(frames.map(f=>d2(shMid(f),hipMid(f))));
+  const ph=golfPhases(frames,unit),A=ph.addr,T=ph.top,I=ph.impact;
+  const leg=near(frames,A,0.2,f=>(d2(f.lm[23],f.lm[25])+d2(f.lm[25],f.lm[27])+d2(f.lm[24],f.lm[26])+d2(f.lm[26],f.lm[28]))/2);
+  const pxIn=(leg/0.49)/cfg.heightIn;
+  const sA=0.15,sT=0.03,sI=0.012,m={};
+  const headA=nearPt(frames,A,sA,head),hipA=nearPt(frames,A,sA,hipMid),hipI=nearPt(frames,I,sI,hipMid),headI=nearPt(frames,I,sI,head);
+  if(ph.down>0.05)m.tempo=ph.back/ph.down;
+  if(cfg.view==='face'){
+    const td=Math.sign(frames[A].lm[lead.sh].x-frames[A].lm[trail.sh].x)||1;
+    const rS=refVec(frames,A,sA,lead.sh,trail.sh),rH=refVec(frames,A,sA,lead.hip,trail.hip);
+    const sTop=near(frames,T,sT,f=>yawBetween(rS,hv(f,lead.sh,trail.sh)));
+    const sg=Math.sign(sTop)||1;
+    m.shoulderTurn=Math.abs(sTop);
+    m.hipTurnTop=Math.max(0,sg*near(frames,T,sT,f=>yawBetween(rH,hv(f,lead.hip,trail.hip))));
+    m.hipOpenImpact=-sg*near(frames,I,sI,f=>yawBetween(rH,hv(f,lead.hip,trail.hip)));
+    m.shoulderTiltTop=near(frames,T,sT,f=>tilt3(f,lead.sh,trail.sh));
+    m.shoulderTiltImpact=-near(frames,I,sI,f=>tilt3(f,lead.sh,trail.sh));
+    m.headSwayTop=(nearPt(frames,T,sT,head).x-headA.x)*td/pxIn;
+    m.headImpact=(headI.x-headA.x)*td/pxIn;
+    m.hipShiftImpact=(hipI.x-hipA.x)*td/pxIn;
+    m.spineTiltAddr=-near(frames,A,sA,lean)*td;
+    m.leadArmTop=near(frames,T,sT,f=>joint(f,lead.sh,lead.el,lead.wr));
+  }else{
+    const H=frames.map(hands),HA=nearPt(frames,A,sA,hands);
+    const bd=Math.sign(HA.x-hipA.x)||1;
+    m.postureAddr=near(frames,A,sA,lean)*bd;
+    m.postureChange=near(frames,I,sI,lean)*bd-m.postureAddr;
+    m.hipToBall=(hipI.x-hipA.x)*bd/pxIn;
+    m.headRise=-(headI.y-headA.y)/pxIn;
+    m.kneeFlexAddr=180-near(frames,A,sA,f=>(ang2(f.lm[23],f.lm[25],f.lm[27])+ang2(f.lm[24],f.lm[26],f.lm[28]))/2);
+    const y=(H[A].y+H[T].y)/2,xb=crossX(frames,H,A,T,y),xd=crossX(frames,H,T,I,y);
+    m.handPath=(xd-xb)*bd/pxIn;
+  }
+  return {metrics:m,phases:[{key:'address',label:'Address',t:frames[A].t},{key:'top',label:'Top',t:frames[T].t},{key:'impact',label:'Impact',t:frames[I].t},{key:'finish',label:'Finish',t:frames[ph.finish].t}],
+    info:{back:ph.back,down:ph.down}};
+}
+
+function analyzePitch(frames,cfg){
+  const thr=SIDE[cfg.hand],glv=SIDE[cfg.hand==='R'?'L':'R'],n=frames.length;
+  const unit=med(frames.map(f=>d2(shMid(f),hipMid(f))));
+  const v=speeds(frames,frames.map(f=>f.lm[thr.wr]),unit);
+  const iR=argBest(n,()=>true,i=>v[i]);
+  if(iR<0||v[iR]<4)throw fail('nomotion');
+  const tR=frames[iR].t;
+  const iK=argBest(n,i=>frames[i].t>=tR-3&&frames[i].t<=tR-0.25,i=>frames[i].lm[glv.kn].y,true);
+  if(iK<0)throw fail('short');
+  const an=frames.map(f=>f.lm[glv.an]),va=speeds(frames,an,unit);
+  const inWin=i=>i>iK&&i<=iR;
+  const iPa=argBest(n,inWin,i=>va[i]);
+  let yG=-Infinity;for(let i=iK;i<=iR;i++)yG=Math.max(yG,an[i].y);
+  let iF=-1;
+  if(iPa>=0)for(let i=iPa+1;i<=iR;i++){if(an[i].y>=yG-0.12*unit&&va[i]<0.35*va[iPa]){iF=i;break;}}
+  if(iF<0||tR-frames[iF].t<0.05){iF=argBest(n,i=>i>iK&&frames[i].t<=tR-0.14,i=>frames[i].t);if(iF<0)iF=Math.max(iK+1,iR-1);}
+  const hPx=near(frames,iK,0.15,f=>d2(f.lm[thr.hip],f.lm[thr.kn])+d2(f.lm[thr.kn],f.lm[thr.an]))/0.49;
+  const sF=0.02,sR=0.012,m={};
+  const leadF=nearPt(frames,iF,sF,f=>f.lm[glv.an]),backF=nearPt(frames,iF,sF,f=>f.lm[thr.an]),backK=nearPt(frames,iK,0.1,f=>f.lm[thr.an]);
+  const kF=180-near(frames,iF,sF,f=>joint(f,glv.hip,glv.kn,glv.an)),kR=180-near(frames,iR,sR,f=>joint(f,glv.hip,glv.kn,glv.an));
+  m.leadKneeFC=kF;m.kneeExt=kF-kR;
+  m.sepFC=near(frames,iF,sF,f=>Math.abs(yawBetween(hv(f,23,24),hv(f,11,12))));
+  if(cfg.view==='side'){
+    const pd=Math.sign(leadF.x-backK.x)||1;
+    m.stride=Math.abs(leadF.x-backF.x)/hPx*100;
+    m.trunkTiltBR=near(frames,iR,sR,lean)*pd;
+    m.elbowFlexFC=180-near(frames,iF,sF,f=>joint(f,thr.sh,thr.el,thr.wr));
+    m.shoulderAbdFC=near(frames,iF,sF,f=>joint(f,thr.hip,thr.sh,thr.el));
+  }else{
+    const tdx=cfg.hand==='R'?1:-1;
+    m.latTiltBR=-near(frames,iR,sR,lean)*tdx;
+    m.shoulderAbdBR=near(frames,iR,sR,f=>ang2(f.lm[thr.hip],f.lm[thr.sh],f.lm[thr.el]));
+    m.strideDir=(leadF.x-backK.x)*tdx/(hPx/cfg.heightIn);
+  }
+  return {metrics:m,phases:[{key:'lift',label:'Leg lift',t:frames[iK].t},{key:'plant',label:'Foot plant',t:frames[iF].t},{key:'release',label:'Release',t:tR}],
+    info:{plantToRelease:tR-frames[iF].t}};
+}
+
+function analyze(frames,cfg){
+  frames=frames.filter(f=>f&&f.lm).sort((a,b)=>a.t-b.t);
+  if(frames.length<12)throw fail('nobody');
+  const r=cfg.sport==='golf'?analyzeGolf(frames,cfg):analyzePitch(frames,cfg);
+  for(const k of Object.keys(r.metrics))if(!Number.isFinite(r.metrics[k]))delete r.metrics[k];
+  return r;
+}
+
+/* ---------- Targets, tips and drills ---------- */
+const T='tour',G='guide';
+const sgn=(pos,neg)=>v=>Math.abs(v)<0.05?'0 in':Math.abs(v).toFixed(1)+' in '+(v>0?pos:neg);
+const DEFS={
+ tempo:{label:'Tempo, backswing to downswing',unit:':1',lo:2.6,hi:3.4,tol:1.5,axis:[1,6],src:T,fmt:v=>v.toFixed(1)+' : 1',
+  ref:'Tour pros cluster at 3 : 1, commonly 21/7, 24/8 or 27/9 video frames (Tour Tempo).',
+  what:'Time from first move to the top, divided by time from the top to impact.',
+  low:{tip:'Your backswing is quick for the speed of your downswing. A snatched takeaway leaves no time to load.',drills:['Count it: say "one, two, three" going back and "four" at impact. Hit 10 balls at 70% holding the count.','Feet-together swings with a 9-iron, 10 balls, finishing in balance.']},
+  high:{tip:'The backswing drags or the downswing is rushed from the top. Either way the club arrives out of sequence.',drills:['Continuous swings: swing back and through five times without stopping, letting the club set the rhythm.','Count "one, two, three" back and "four" at impact, at a pace where "four" lands on the strike.']}},
+ shoulderTurn:{label:'Shoulder turn at the top',unit:'°',lo:85,hi:105,tol:30,axis:[40,130],src:T,
+  ref:'Tour average about 90° (GolfTEC, 30,000 golfers); about 98° chest turn for men on tour (Sportsbox).',
+  what:'How far your shoulders rotate away from the target from address to the top. Estimated from one camera, so read it as plus or minus 10°.',
+  low:{tip:'Your turn stops short, so the arms lift to finish the backswing and the downswing starts from the top with the hands.',drills:['Back to the target: club across your shoulders, in posture, turn until your back faces the target. Hold 2 seconds, 10 reps.','Hit 10 half-speed 7-irons where the only goal is lead shoulder under your chin.']},
+  high:{tip:'You are turning past the point where you can hold posture. Long swings are hard to time.',drills:['Three-quarter swings: stop the lead arm at 10 o\'clock and hit 10 balls at 80%.']}},
+ hipTurnTop:{label:'Hip turn at the top',unit:'°',lo:35,hi:50,tol:20,axis:[0,80],src:T,
+  ref:'About 40° on tour, against roughly 100° of chest turn (Sportsbox).',
+  what:'Rotation of your pelvis from address to the top.',
+  low:{tip:'Locked hips limit your shoulder turn and push the arms up instead of around.',drills:['Trail pocket back: set a chair a few inches behind your trail hip. Turn until the pocket touches it, 10 reps, then hit balls keeping that feel.']},
+  high:{tip:'The hips turn nearly as much as the shoulders, so there is no stretch to unwind.',drills:['Brace the trail knee: keep it flexed and feel pressure on the inside of the trail foot. Half swings, 10 balls.']}},
+ shoulderTiltTop:{label:'Shoulder tilt at the top',unit:'°',lo:31,hi:41,tol:14,axis:[5,60],src:T,
+  ref:'Pros 36°, high handicappers 29.6° (GolfTEC).',
+  what:'How far your lead shoulder points down at the top. Flat shoulders at the top usually mean a steep, across-the-ball downswing.',
+  low:{tip:'You turn level, like looking behind you. Pros work the lead shoulder down toward the ball.',drills:['Club across the shoulders in posture. Turn so the grip end points at the ball, 10 reps.']},
+  high:{tip:'Too much tilt tips your weight toward the target at the top.',drills:['Turn around the trail hip: feel your chest stay over the trail thigh as you turn, 10 slow rehearsals.']}},
+ headSwayTop:{label:'Head movement to the top',unit:'in',lo:-2,hi:1,tol:3,axis:[-7,7],src:G,fmt:sgn('toward target','away from target'),
+  ref:'Coaching guideline: stay within about 2 inches of where you started.',
+  what:'Sideways travel of your head from address to the top.',
+  low:{tip:'Your head slides off the ball in the backswing, so you have to slide back the same amount to find it.',drills:['Feet-together swings, 10 balls with a short iron.','Shadow check: with the sun behind you, keep your head\'s shadow on a tee while you turn.']},
+  high:{tip:'Your head moves toward the target in the backswing, a reverse pivot. Weight ends up on the wrong foot.',drills:['Step-back rehearsal: lift the lead foot at the top of 10 practice swings to feel weight on the trail side.']}},
+ headImpact:{label:'Head position at impact',unit:'in',lo:-1.5,hi:1.5,tol:3,axis:[-8,8],src:G,fmt:sgn('ahead of address','behind address'),
+  ref:'Coaching guideline. Irons: head close to where it started. Driver: head stays behind the ball.',
+  what:'Where your head is at impact compared with address.',
+  low:{tip:'You hang back through impact. With an iron the club bottoms out behind the ball.',drills:['Lead-foot-only finish: hit 10 half shots and hold the finish with the trail foot off the ground.']},
+  high:{tip:'Your upper body lunges toward the target, which steepens the club and costs speed.',drills:['Stick by the ear: have a friend hold an alignment stick beside your lead ear. Swing without touching it.']}},
+ hipOpenImpact:{label:'Hip turn at impact',unit:'°',lo:30,hi:45,tol:20,axis:[-10,70],src:T,fmt:v=>Math.round(Math.abs(v))+'° '+(v>=0?'open':'closed'),
+  ref:'Pros 36° open, high handicappers 19.5° (GolfTEC).',
+  what:'How far your hips have turned toward the target when the club meets the ball.',
+  low:{tip:'Your hips stall and the hands take over. That flip is where thin and fat shots come from.',drills:['Pump drill: from the top, drop to hip height three times with the belt buckle turning to the target, then hit.','Step-through: hit 10 shots letting the trail foot walk past the lead foot after impact.']},
+  high:{tip:'The hips spin open before the arms can catch up, leaving the club stuck behind you.',drills:['Trail foot back: pull the trail foot 6 inches from the line and hit 10 half shots with arms and body arriving together.']}},
+ hipShiftImpact:{label:'Hip shift toward the target at impact',unit:'in',lo:1.5,hi:5,tol:3,axis:[-4,8],src:T,fmt:sgn('forward','back'),
+  ref:'Pros have their hips ahead of where they started at impact; less skilled players drift behind the ball (GolfTEC). Inch range is a coaching guideline.',
+  what:'How far your pelvis has moved toward the target at impact compared with address.',
+  low:{tip:'You are hitting off the back foot. The low point of the swing ends up behind the ball.',drills:['Step drill: start feet together, step toward the target as the club reaches the top, then swing. 10 balls.','Line drill: draw a line on the turf and make the divot start on the target side of it.']},
+  high:{tip:'You slide past the ball instead of turning. Expect pushes and heel strikes.',drills:['Post up: put a bag or alignment stick just outside the lead hip. Bump it, then turn. Do not push it over.']}},
+ shoulderTiltImpact:{label:'Shoulder tilt at impact',unit:'°',lo:33,hi:45,tol:15,axis:[5,65],src:T,
+  ref:'Pros 39° with the trail shoulder lower, high handicappers 27.5° (GolfTEC).',
+  what:'How much lower your trail shoulder is than your lead shoulder at impact.',
+  low:{tip:'Level shoulders at impact are the mark of an arms-and-shoulders downswing that cuts across the ball.',drills:['9-to-3 punches: waist high to waist high, trail shoulder working under your chin. 15 balls.','Trail-hand-only half swings, brushing the turf in the same spot each time.']},
+  high:{tip:'You are leaning back too far through the strike.',drills:['Cover the ball: hit low punch shots feeling your chest stay over the ball past impact.']}},
+ spineTiltAddr:{label:'Spine tilt at address',unit:'°',lo:0,hi:8,tol:8,axis:[-10,25],src:G,fmt:v=>Math.round(Math.abs(v))+'° '+(v>=0?'away from target':'toward target'),
+  ref:'Coaching guideline: a few degrees with an iron, more with a driver. Rory McIlroy sets up 13° away from the target with driver (GEARS).',
+  what:'Lean of your upper body away from the target at setup.',
+  low:{tip:'You set up with your upper body level or leaning toward the target, which promotes a steep, downward hit.',drills:['At setup, bump the lead hip an inch toward the target and let the trail shoulder sit lower. Check it in a mirror 10 times.']},
+  high:{tip:'That much lean away from the target moves the low point back.',drills:['Stand taller with the ball nearer the middle of your stance and your sternum over it.']}},
+ leadArmTop:{label:'Lead arm at the top',unit:'°',lo:150,hi:180,tol:40,axis:[90,180],src:G,
+  ref:'Coaching guideline: close to straight. 180° is a fully straight arm.',
+  what:'Bend in your lead elbow at the top.',
+  low:{tip:'The lead arm folds, so the swing gets longer without any more turn.',drills:['Split-grip backswings: hands 4 inches apart, swing back until the lead arm starts to bend and stop there. 10 reps.']},
+  high:{tip:'',drills:[]}},
+ postureAddr:{label:'Forward bend at address',unit:'°',lo:28,hi:42,tol:12,axis:[5,65],src:G,
+  ref:'Coaching guideline: roughly 30 to 40° from the hips.',
+  what:'How far your upper body leans toward the ball at setup.',
+  low:{tip:'You stand too tall, so the arms have no room and the swing gets flat.',drills:['Hinge from the hips: club along your spine, push your hips back until the club tilts about 35°, then let the arms hang.']},
+  high:{tip:'You are bent over too far, which makes it hard to turn and easy to stand up through the ball.',drills:['Stand closer to the ball with weight over the balls of your feet and your chest up.']}},
+ postureChange:{label:'Posture kept to impact',unit:'°',lo:-6,hi:6,tol:10,axis:[-30,20],src:G,fmt:v=>Math.abs(v)<1?'held':Math.round(Math.abs(v))+'° '+(v>0?'more bend':'stood up'),
+  ref:'Coaching guideline: within about 5° of your address bend.',
+  what:'Change in your forward bend between address and impact.',
+  low:{tip:'You stand up through the ball, called early extension. The club gets pushed out toward the toe or you catch it thin.',drills:['Chair drill: set a chair touching your backside at address. Keep contact with it through impact on 10 slow swings, then 10 balls.']},
+  high:{tip:'You dive toward the ball in the downswing.',drills:['Tee above the visor: have a friend hold a club just above your head. Swing without bumping it.']}},
+ hipToBall:{label:'Hips moving toward the ball',unit:'in',lo:-3,hi:1,tol:3,axis:[-8,8],src:G,fmt:sgn('toward ball','away from ball'),
+  ref:'Coaching guideline: hips stay back on the line they started on.',
+  what:'How far your pelvis moves toward the ball between address and impact.',
+  low:{tip:'Your hips back away a long way, usually with weight falling onto the heels.',drills:['Hit 10 shots holding the finish for 3 seconds with weight on the lead foot.']},
+  high:{tip:'Your hips thrust toward the ball. That crowds the arms and is the main cause of shanks, blocks and thin strikes.',drills:['Chair drill: backside stays on the chair through impact. 10 slow swings, then 10 balls.','Wall turns: stand with your backside against a wall and rehearse the downswing with the lead hip sliding along it.']}},
+ headRise:{label:'Head height at impact',unit:'in',lo:-2.5,hi:1,tol:3,axis:[-8,8],src:G,fmt:sgn('higher','lower'),
+  ref:'Coaching guideline: level or slightly lower than address.',
+  what:'Change in the height of your head between address and impact.',
+  low:{tip:'You drop a lot in the downswing, which puts the club into the ground early.',drills:['Hit 10 balls off a low tee with a 7-iron, clipping the tee without taking a divot.']},
+  high:{tip:'Your head lifts through the ball, so the club rises with it and catches the top half.',drills:['Hit 10 punch shots keeping your chest pointed at the ball until it is gone.']}},
+ kneeFlexAddr:{label:'Knee flex at address',unit:'°',lo:15,hi:30,tol:12,axis:[0,60],src:G,
+  ref:'Coaching guideline: a light, athletic flex.',
+  what:'Bend in your knees at setup.',
+  low:{tip:'Straight legs lock the hips.',drills:['Unlock the knees until you feel weight in the balls of your feet.']},
+  high:{tip:'Sitting too deep puts weight on the heels and limits turn.',drills:['Stand taller and bend from the hips instead of the knees.']}},
+ handPath:{label:'Downswing hand path',unit:'in',lo:-5,hi:0.5,tol:3,axis:[-10,8],src:G,fmt:v=>Math.abs(v)<0.3?'on the same path':Math.abs(v).toFixed(1)+' in '+(v>0?'outside backswing':'inside backswing'),
+  ref:'Coaching guideline: hands come down on or inside the path they went up on.',
+  what:'Where your hands are halfway down compared with halfway back. Outside means over the top.',
+  low:{tip:'Your hands drop well inside and the club gets stuck behind you. Expect blocks and hooks.',drills:['Lead-hand-only swings with a wedge, turning your chest through to face the target.']},
+  high:{tip:'Your hands move out toward the ball to start down. This over-the-top move causes pulls, slices and steep, heavy strikes.',drills:['Headcover gate: put a headcover just outside and behind the ball. Miss it on the way down. 15 balls.','Pump drill: from the top, drop your hands toward the trail pocket three times, then swing through.']}},
+ stride:{label:'Stride length',unit:'% of height',lo:77,hi:90,tol:15,axis:[50,110],src:T,fmt:v=>Math.round(v)+'% of height',
+  ref:'83 ± 4% in the ASMI efficient group; pros who reach 80% or more throw harder without added elbow load.',
+  what:'Distance between your ankles at foot plant, as a share of your height.',
+  low:{tip:'A short stride gives your hips less time and distance to rotate before the arm comes through.',drills:['Tape line: mark 80% of your height from the rubber. Stride to the line on 10 dry runs, then 10 throws.','Rocker throws: rock back onto the rear leg, then drive out, 10 reps.']},
+  high:{tip:'You may be reaching past what your front leg can brace against.',drills:['Shorten the stride until your chest can finish out over the front knee.']}},
+ leadKneeFC:{label:'Front knee bend at foot plant',unit:'°',lo:38,hi:52,tol:15,axis:[10,80],src:T,
+  ref:'43 ± 8° (ASMI efficient group); 47 to 49° in pro samples.',
+  what:'Flex in your front knee the moment the foot lands.',
+  low:{tip:'You land on a stiff front leg, so there is nothing to brace and extend against.',drills:['Step-behind throws at 60% effort, landing soft and athletic. 10 reps.']},
+  high:{tip:'The front leg sinks at landing and leaks the energy you built in the stride.',drills:['Stick the landing: stride out and hold the plant position for 2 seconds, 10 reps.','Lead-leg split squats, 3 sets of 8.']}},
+ kneeExt:{label:'Front leg bracing to release',unit:'°',lo:5,hi:35,tol:15,axis:[-30,50],src:T,fmt:v=>Math.round(Math.abs(v))+'° '+(v>=0?'straighter':'more bent'),
+  ref:'Pros in the high-extension group straighten the front knee 33° between plant and release; knee extension speed near release tracks with velocity.',
+  what:'How much your front knee straightens between foot plant and release.',
+  low:{tip:'Your front knee keeps bending after you land. Without a firm front side the trunk has nothing to rotate over.',drills:['Stride-stance throws: start in your landing position, brace the front leg, throw. 15 reps.','Med-ball stride-and-brace throws into a wall, 2 sets of 8.']},
+  high:{tip:'',drills:[]}},
+ trunkTiltBR:{label:'Trunk lean toward the plate at release',unit:'°',lo:32,hi:44,tol:12,axis:[0,70],src:T,
+  ref:'38 ± 6° (ASMI efficient group) against 33 ± 7°; less forward tilt goes with lower velocity.',
+  what:'How far your trunk is tilted forward when the ball leaves your hand.',
+  low:{tip:'You release standing tall, so the ball comes out early and the trunk adds little.',drills:['Towel drill: stride to full length and snap a towel onto a target set one shoe-length past your landing foot. 15 reps.']},
+  high:{tip:'You fold over the front side. Check the front-leg numbers first; a soft front knee is the usual cause.',drills:['Stride-stance throws with a braced front leg, finishing with chest over the knee, not past it.']}},
+ elbowFlexFC:{label:'Throwing elbow bend at foot plant',unit:'°',lo:80,hi:100,tol:25,axis:[20,150],src:T,
+  ref:'90 ± 9° (ASMI efficient group).',
+  what:'Bend in your throwing elbow when the front foot lands.',
+  low:{tip:'The arm is long and late at foot plant, so it has to rush to catch up.',drills:['Pivot pick-offs: from the landing position with the elbow bent 90°, rotate and throw. 15 reps.']},
+  high:{tip:'The arm is tucked tight at foot plant, which shortens the path the hand travels.',drills:['Rocker throws focusing on a loose, full arm swing out of the glove.']}},
+ shoulderAbdFC:{label:'Elbow height at foot plant',unit:'°',lo:80,hi:100,tol:20,axis:[40,140],src:T,
+  ref:'About 90°. The efficient group averaged 86 ± 11°.',
+  what:'Angle between your upper arm and your trunk at foot plant. 90° puts the elbow level with the shoulders.',
+  low:{tip:'Your elbow is below shoulder height when you land, which is linked to higher elbow load.',drills:['Mirror check: stride to foot plant and freeze with the elbow level with the shoulders. 10 reps before throwing.']},
+  high:{tip:'Your elbow is hiked above the shoulder line at landing.',drills:['Pivot pick-offs with the elbows level with the shoulders, 15 reps.']}},
+ sepFC:{label:'Hip-to-shoulder separation at foot plant',unit:'°',lo:45,hi:62,tol:22,axis:[0,90],src:T,
+  ref:'53 ± 9° in the efficient group against 46 ± 9°. Estimated from one camera, so read it as plus or minus 10°.',
+  what:'How far your hips have opened ahead of your shoulders when the front foot lands.',
+  low:{tip:'Your shoulders open with your hips. The trunk has no stretch to unwind and the arm ends up doing the work.',drills:['Closed-shoulder strides: stride to foot plant keeping your chest facing third base (first for lefties). Freeze, check, 10 reps.','Med-ball scoop tosses with the hips leading, 2 sets of 8 each side.']},
+  high:{tip:'',drills:[]}},
+ latTiltBR:{label:'Sideways trunk lean at release',unit:'°',lo:15,hi:32,tol:15,axis:[-10,60],src:T,
+  ref:'24 ± 11° toward the glove side (ASMI).',
+  what:'How far your trunk leans to the glove side at release.',
+  low:{tip:'',drills:[]},
+  high:{tip:'A big lean to the glove side pulls your head off line and adds load at the shoulder and elbow.',drills:['Throw along a chalk line with eyes level through release, 15 reps at 70%.','Stride-stance throws in front of a mirror, keeping your head over your belt.']}},
+ shoulderAbdBR:{label:'Elbow height at release',unit:'°',lo:80,hi:105,tol:20,axis:[40,140],src:T,
+  ref:'About 90° at release (ASMI).',
+  what:'Angle between your upper arm and trunk at release. 90° puts the elbow level with the shoulders.',
+  low:{tip:'Your elbow drops below the shoulder line at release, which costs velocity and raises elbow torque.',drills:['Kneeling throws on the glove-side knee, elbow level with the shoulders, 15 reps.']},
+  high:{tip:'Your elbow rides above the shoulder line. That usually comes with extra sideways lean.',drills:['Mirror dry throws stopping at release to check elbow and shoulders form one line.']}},
+ strideDir:{label:'Stride direction',unit:'in',lo:2,hi:12,tol:8,axis:[-15,25],src:T,fmt:sgn('closed','open'),
+  ref:'Lead foot lands about 20 ± 10 cm to the throwing-arm side of a line to the plate (ASMI).',
+  what:'Where your front foot lands compared with a line from your back foot to the plate.',
+  low:{tip:'You land open, toward the glove side. The hips are already spent and the arm takes the load.',drills:['Chalk a line from your back heel to the plate. Land with your toes on or just across it, 10 dry runs then 10 throws.']},
+  high:{tip:'You land far across your body and have to throw around your front side.',drills:['Same chalk line: land with the front foot touching it.']}}
+};
+const SETS={golf:{face:['tempo','shoulderTurn','hipTurnTop','shoulderTiltTop','headSwayTop','hipOpenImpact','hipShiftImpact','shoulderTiltImpact','headImpact','spineTiltAddr','leadArmTop'],
+  dtl:['tempo','postureAddr','postureChange','hipToBall','headRise','handPath','kneeFlexAddr']},
+  pitch:{side:['stride','leadKneeFC','kneeExt','trunkTiltBR','sepFC','elbowFlexFC','shoulderAbdFC'],behind:['strideDir','latTiltBR','shoulderAbdBR','sepFC','leadKneeFC','kneeExt']}};
+function target(id,cfg){const d=DEFS[id];let lo=d.lo,hi=d.hi;
+  if(cfg.sport==='golf'&&cfg.club==='driver'){
+    if(id==='spineTiltAddr'){lo=6;hi=14;}
+    if(id==='headImpact'){lo=-4;hi=0;}
+    if(id==='hipShiftImpact'){lo=0.5;hi=4;}
+  }
+  return {lo,hi};}
+function grade(id,v,cfg){const d=DEFS[id],{lo,hi}=target(id,cfg);const off=v<lo?lo-v:v>hi?v-hi:0;const score=Math.round(clamp(100-100*off/d.tol,0,100));
+  return {id,value:v,lo,hi,score,dir:v<lo?'low':v>hi?'high':'in',status:score>=85?'good':score>=55?'near':'bad'};}
+function gradeAll(metrics,cfg){const ids=SETS[cfg.sport][cfg.view].filter(id=>id in metrics);const rows=ids.map(id=>grade(id,metrics[id],cfg));
+  const score=rows.length?Math.round(rows.reduce((s,r)=>s+r.score,0)/rows.length):0;
+  const prios=rows.filter(r=>r.status!=='good'&&DEFS[r.id][r.dir]&&DEFS[r.id][r.dir].tip).sort((a,b)=>a.score-b.score).slice(0,3);
+  return {rows,score,prios};}
+root.KC={analyze,peakTime,gradeAll,DEFS,SETS,target};
+})(typeof window!=='undefined'?window:globalThis);
+</script>
+
+<script>
+/* ---------- App ---------- */
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const cfg={sport:'golf',club:'iron',view:'face',hand:'R',heightIn:70};
+const VIEWS={golf:[['face','Face-on (from the side)'],['dtl','Down the line (from behind)']],pitch:[['side','Side (open side)'],['behind','Behind the mound']]};
+const TIPS={
+ face:['Phone straight in front of your chest, about 10 feet away, at hand height.','Hold it upright. Your whole body and the club at the top must stay in the frame.','Stand still at address for one second before you swing.'],
+ dtl:['Phone behind you on the line through your hands to the target, about 10 feet back, at hand height.','Hold it upright. Keep your head, feet and the ball in the frame.','Stand still at address for one second before you swing.'],
+ side:['Phone on your open side: third-base side for a righty, first-base side for a lefty.','Turn it sideways, 15 to 20 feet away, level with the middle of your stride.','Keep the rubber and your landing spot both in the frame.'],
+ behind:['Phone behind the mound, in line with the rubber and the plate, chest high.','Hold it upright, 12 to 15 feet back, so it sees your back at release.','Keep both feet in the frame from leg lift to landing.']
+};
+const COMMON=['Regular video works best, 60 frames per second if your phone offers it. Keep the clip under 10 seconds.','Bright light, a plain background, and only one person in the shot.'];
+
+/* setup form */
+function buildViews(){const box=$('seg-view');box.innerHTML=VIEWS[cfg.sport].map(([v,l],i)=>`<input type="radio" name="view" id="view-${v}" value="${v}"${i===0?' checked':''}><label for="view-${v}">${l}</label>`).join('');cfg.view=VIEWS[cfg.sport][0][0];}
+function syncSetup(){$('f-club').hidden=cfg.sport!=='golf';$('hand-lbl').textContent=cfg.sport==='golf'?'Swings':'Throws';
+  $('cam-tips').innerHTML=TIPS[cfg.view].concat(COMMON).map(t=>`<li>${esc(t)}</li>`).join('');}
+(function initHeight(){let h=70;try{h=+localStorage.getItem('kc_height')||70;}catch(e){}cfg.heightIn=h;
+  $('h-ft').innerHTML=[4,5,6,7].map(f=>`<option value="${f}">${f} ft</option>`).join('');
+  $('h-in').innerHTML=Array.from({length:12},(_,i)=>`<option value="${i}">${i} in</option>`).join('');
+  $('h-ft').value=Math.floor(h/12);$('h-in').value=h%12;
+  const up=()=>{cfg.heightIn=(+$('h-ft').value)*12+(+$('h-in').value);try{localStorage.setItem('kc_height',cfg.heightIn);}catch(e){}};
+  $('h-ft').onchange=up;$('h-in').onchange=up;})();
+document.addEventListener('change',e=>{const t=e.target;if(t.name==='sport'){cfg.sport=t.value;buildViews();syncSetup();}
+  else if(t.name==='club')cfg.club=t.value;else if(t.name==='view'){cfg.view=t.value;syncSetup();}else if(t.name==='hand')cfg.hand=t.value;});
+buildViews();syncSetup();
+
+/* tabs */
+function showTab(){let h=(location.hash||'#analyze').slice(1);if(!['analyze','pro-numbers','history'].includes(h))h='analyze';
+  for(const k of ['analyze','pro-numbers','history'])$('view-'+k).hidden=k!==h;
+  document.querySelectorAll('nav a').forEach(a=>{if(a.dataset.tab===h)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});
+  if(h==='history')renderHistory();}
+window.addEventListener('hashchange',showTab);
+
+/* body tracker */
+let posePromise=null,lastRes=null;
+const BASE=location.protocol==='http:'?'vendor/':'https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/';
+function loadLib(){return new Promise((res,rej)=>{if(typeof Pose!=='undefined')return res();const s=document.createElement('script');s.src=BASE+'pose.js';s.onload=()=>res();s.onerror=()=>rej(new Error('tracker'));document.head.appendChild(s);});}
+function withTimeout(p,ms){return Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(new Error('tracker')),ms))]);}
+function getPose(){if(!posePromise){posePromise=(async()=>{await loadLib();if(typeof Pose==='undefined')throw new Error('tracker');
+  const p=new Pose({locateFile:f=>BASE+f});
+  p.setOptions({modelComplexity:1,smoothLandmarks:false,enableSegmentation:false,minDetectionConfidence:0.5,minTrackingConfidence:0.5});
+  p.onResults(r=>{lastRes=r;});await withTimeout(p.initialize(),90000);
+  const c=document.createElement('canvas');c.width=c.height=64;c.getContext('2d').fillRect(0,0,64,64);await withTimeout(p.send({image:c}),90000);return p;})();posePromise.catch(()=>{posePromise=null;});}
+  return posePromise;}
+
+const video=$('src'),work=document.createElement('canvas'),wctx=work.getContext('2d',{willReadFrequently:false});
+const raf=()=>new Promise(r=>requestAnimationFrame(()=>r()));
+function seek(t){return new Promise(res=>{let done=false;const fin=()=>{if(done)return;done=true;video.removeEventListener('seeked',fin);res();};
+  video.addEventListener('seeked',fin);try{video.currentTime=t;}catch(e){fin();}setTimeout(fin,2000);});}
+async function grab(pose,t){await seek(t);await raf();wctx.drawImage(video,0,0,work.width,work.height);lastRes=null;await pose.send({image:work});
+  const r=lastRes;if(!r||!r.poseLandmarks)return {t,lm:null};
+  return {t,lm:r.poseLandmarks.map(p=>({x:p.x*work.width,y:p.y*work.height,v:p.visibility})),w:r.poseWorldLandmarks?r.poseWorldLandmarks.map(p=>({x:p.x,y:p.y,z:p.z})):null};}
+
+const BONES=[[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28],[27,31],[28,32]];
+function drawPose(ctx,f,sx,sy){if(!f||!f.lm)return;const cs=getComputedStyle(document.documentElement);
+  ctx.lineWidth=Math.max(2,ctx.canvas.width/180);ctx.strokeStyle='#FFFFFF';ctx.lineCap='round';
+  for(const [a,b] of BONES){ctx.beginPath();ctx.moveTo(f.lm[a].x*sx,f.lm[a].y*sy);ctx.lineTo(f.lm[b].x*sx,f.lm[b].y*sy);ctx.stroke();}
+  ctx.fillStyle=cs.getPropertyValue('--accent').trim()||'#E24A14';
+  for(const i of [0,11,12,13,14,15,16,23,24,25,26,27,28]){ctx.beginPath();ctx.arc(f.lm[i].x*sx,f.lm[i].y*sy,ctx.lineWidth*1.5,0,6.283);ctx.fill();}}
+function paint(canvas,f){const ctx=canvas.getContext('2d');ctx.drawImage(video,0,0,canvas.width,canvas.height);drawPose(ctx,f,canvas.width/work.width,canvas.height/work.height);}
+
+function say(msg){const a=$('alert');a.textContent=msg;a.hidden=!msg;if(msg)a.scrollIntoView({block:'center',behavior:'smooth'});}
+const ERR={nobody:'I could not find a person in most of the video. Make sure your whole body is in the frame with good light, then try again.',
+  nomotion:cfgNow=>cfgNow.sport==='golf'?'I found you but not a full swing. Start the clip at address, stand still for a second, and keep your hands in view all the way.':'I found you but not a full throw. Keep your throwing arm in view and include the whole delivery from leg lift to release.',
+  short:'The clip starts too late. Begin recording before the leg lift.',
+  tracker:'The body tracker did not load. Check your connection and reload. If it still fails, this viewer is blocking it: tell Claude "tracker blocked".',
+  video:'That video would not open on this phone. Try recording a new one with the Record button.'};
+
+let current=null,objUrl=null;
+async function run(file){
+  say('');$('report').innerHTML='';current=null;
+  const prog=$('progress'),bar=$('bar'),txt=$('prog-txt'),live=$('live');prog.hidden=false;bar.style.width='0';txt.textContent='Opening the video.';
+  prog.scrollIntoView({block:'start',behavior:'smooth'});
+  const runCfg={...cfg};
+  try{
+    if(objUrl)URL.revokeObjectURL(objUrl);objUrl=URL.createObjectURL(file);
+    video.muted=true;video.setAttribute('webkit-playsinline','');
+    await new Promise((res,rej)=>{const ok=()=>res();video.onloadedmetadata=ok;video.onloadeddata=ok;video.oncanplay=ok;video.onerror=()=>rej(new Error('video'));video.src=objUrl;video.load();setTimeout(()=>video.readyState>=1?res():rej(new Error('video')),25000);});
+    try{await video.play();video.pause();}catch(e){}
+    for(let i=0;i<40&&video.readyState<2;i++)await new Promise(r=>setTimeout(r,100));
+    const dur=video.duration;if(!Number.isFinite(dur)||dur<=0||!video.videoWidth)throw new Error('video');
+    const k=Math.min(1,640/Math.max(video.videoWidth,video.videoHeight));
+    work.width=Math.round(video.videoWidth*k);work.height=Math.round(video.videoHeight*k);
+    live.width=work.width;live.height=work.height;
+    txt.textContent='Loading the body tracker.';
+    let pose;try{pose=await getPose();}catch(e){throw new Error('tracker');}
+    const frames=[];
+    const step=Math.max(1/25,dur/220),n1=Math.max(1,Math.floor((dur-0.05)/step));
+    for(let i=0;i<=n1;i++){const f=await grab(pose,Math.min(dur-0.03,i*step));frames.push(f);paint(live,f);
+      bar.style.width=(70*i/n1).toFixed(1)+'%';txt.textContent='Tracking your body, pass 1 of 2.';}
+    const found=frames.filter(f=>f.lm).length;if(found<Math.max(12,frames.length*0.4))throw Object.assign(new Error('nobody'),{code:'nobody'});
+    const tp=KC.peakTime(frames,runCfg);
+    if(tp!=null){const a=Math.max(0,tp-(runCfg.sport==='golf'?0.5:0.4)),b=Math.min(dur-0.03,tp+0.2),fs=1/120,n2=Math.floor((b-a)/fs);
+      try{pose.reset();}catch(e){}
+      for(let i=0;i<=n2;i++){const f=await grab(pose,a+i*fs);frames.push(f);paint(live,f);bar.style.width=(70+25*i/Math.max(1,n2)).toFixed(1)+'%';txt.textContent='Slowing down the fast part, pass 2 of 2.';}}
+    const good=frames.filter(f=>f.lm).sort((x,y)=>x.t-y.t);
+    const res=KC.analyze(good,runCfg);
+    txt.textContent='Building your report.';
+    const thumbs=[];const tc=document.createElement('canvas');tc.width=180;tc.height=Math.round(180*work.height/work.width);
+    for(const p of res.phases){await seek(p.t);await raf();paint(tc,nearest(good,p.t));thumbs.push({...p,img:tc.toDataURL('image/jpeg',0.7)});}
+    bar.style.width='100%';
+    current={cfg:runCfg,metrics:res.metrics,info:res.info,phases:thumbs,frames:good,ts:Date.now()};
+    prog.hidden=true;renderReport(current,false);saveHistory(current);
+  }catch(e){
+    prog.hidden=true;const c=e.code||e.message;let m=ERR[c];if(typeof m==='function')m=m(runCfg);
+    const why=c==='video'?' (video code '+(video.error?video.error.code:'none')+', state '+video.readyState+', '+(file.type||'unknown type')+')':(!m?' ('+String(e.message||e).slice(0,80)+')':'');
+    say((m||'Something went wrong while reading the video. Try a shorter clip.')+why);
+    renderReport(EXAMPLE,true);
+  }
+}
+function nearest(frames,t){let b=null,bd=1e9;for(const f of frames){const d=Math.abs(f.t-t);if(d<bd){bd=d;b=f;}}return b;}
+for(const id of ['file-rec','file-pick'])$(id).addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];e.target.value='';if(f)run(f);});
+
+/* report */
+const NAMES={golf:'Golf',pitch:'Pitching',iron:'Iron',driver:'Driver',face:'Face-on',dtl:'Down the line',side:'Side view',behind:'Behind the mound'};
+function fmtVal(id,v){const d=KC.DEFS[id];if(d.fmt)return d.fmt(v);return Math.round(v)+(d.unit==='°'?'°':' '+d.unit);}
+function fmtRange(id,lo,hi){const d=KC.DEFS[id];const u=d.unit==='°'?'°':d.unit===':1'?' : 1':' '+d.unit;return lo+' to '+hi+u;}
+function pct(d,v){return (100*Math.max(0,Math.min(1,(v-d.axis[0])/(d.axis[1]-d.axis[0])))).toFixed(1);}
+const STAT={good:'In range',near:'Close',bad:'Work on this'};
+function renderReport(r,example){
+  const g=KC.gradeAll(r.metrics,r.cfg),c=r.cfg;
+  const chips=[NAMES[c.sport],c.sport==='golf'?NAMES[c.club]:null,NAMES[c.view],(c.hand==='R'?'Right':'Left')+'-handed'].filter(Boolean).map(x=>`<span class="chip">${x}</span>`).join('');
+  const verdict=g.score>=85?'Close to the pro pattern in this view.':g.score>=65?'Solid base with a couple of clear gains.':'A few big pieces to fix first.';
+  let h=`<section class="card"><div class="scorehead"><div class="score">${g.score}<small>/100</small></div><div class="scoremeta">${example?'<span class="tag">Example report</span>':''}<h2>${example?'What you will get':'Mechanics score'}</h2><p>${example?'Sample numbers for a mid-handicap iron swing. Record a video above to replace them with yours.':verdict}</p><div class="chips">${chips}</div></div></div>`;
+  if(r.phases&&r.phases.length&&!example){h+=`<div class="thumbs">${r.phases.map((p,i)=>`<button type="button" data-jump="${i}"><img alt="${esc(p.label)} position" src="${p.img}"><span>${esc(p.label)}</span></button>`).join('')}</div>
+    <div class="stage"><canvas id="review"></canvas></div><input type="range" id="scrub" min="0" max="1000" value="0" aria-label="Scrub through the video">
+    <div class="row"><button class="btn small" type="button" id="play">Play at quarter speed</button><span class="note" id="clock"></span></div>`;}
+  h+=`</section>`;
+  if(g.prios.length){h+=`<section class="card"><h2>Fix these first</h2><div class="prio">`+g.prios.map(p=>{const d=KC.DEFS[p.id],t=d[p.dir];
+    return `<article class="${p.status==='near'?'near':''}"><h3>${esc(d.label)}</h3><p class="num">You: <b>${esc(fmtVal(p.id,p.value))}</b>. Pro range: ${esc(fmtRange(p.id,p.lo,p.hi))}.</p><p>${esc(t.tip)}</p>${t.drills.length?`<span class="eyebrow">Drills</span><ul>${t.drills.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}</article>`;}).join('')+`</div></section>`;}
+  else if(g.rows.length){h+=`<section class="card"><h2>Nothing out of range</h2><p>Every number in this view sits in or near the pro range. Film the other angle to check the rest.</p></section>`;}
+  h+=`<section class="card"><h2>All measurements</h2><p class="note">The shaded band is the pro range. Tap a row for what it means and where the range comes from.</p><ul class="metrics">`+g.rows.map(x=>{const d=KC.DEFS[x.id];
+    const l=pct(d,x.lo),w=(pct(d,x.hi)-l).toFixed(1);
+    return `<li class="st-${x.status==='bad'?'bad':x.status}"><details><summary><div class="mh"><span class="n">${esc(d.label)}</span><span class="v">${esc(fmtVal(x.id,x.value))}</span></div>
+      <div class="ruler"><div class="band" style="left:${l}%;width:${w}%"></div><div class="dot" style="left:${pct(d,x.value)}%"></div></div>
+      <div class="mf"><span>Pro range ${esc(fmtRange(x.id,x.lo,x.hi))}</span><span class="pill">${STAT[x.status]}</span></div></summary>
+      <div class="more"><p>${esc(d.what)}</p><p>${d.src==='tour'?'Measured data: ':''}${esc(d.ref)}</p></div></details></li>`;}).join('')+`</ul>`;
+  if(r.info&&r.info.plantToRelease!=null)h+=`<p class="note">Foot plant to release: ${r.info.plantToRelease.toFixed(2)} s. Pros take about 0.145 s. Phone video is too slow to grade this closely.</p>`;
+  if(r.info&&r.info.back!=null)h+=`<p class="note">Backswing ${r.info.back.toFixed(2)} s, downswing ${r.info.down.toFixed(2)} s.</p>`;
+  h+=`<p class="note">These are estimates from one phone camera. Angles that involve rotation can be off by about 10°, so trust trends across several videos over any single number.${c.sport==='pitch'?' Pro ranges come from adult pitchers. Stop throwing if anything hurts.':''}</p></section>`;
+  $('report').innerHTML=h;
+  if(!example&&r.frames)wireReview(r);
+  if(!example)$('report').scrollIntoView({block:'start',behavior:'smooth'});
+}
+function wireReview(r){const cv=$('review'),scrub=$('scrub'),clock=$('clock'),play=$('play');if(!cv)return;
+  cv.width=work.width;cv.height=work.height;const dur=video.duration;let busy=false,want=null,playing=false;
+  async function show(t){want=t;if(busy)return;busy=true;while(want!=null){const tt=want;want=null;await seek(tt);await raf();paint(cv,nearest(r.frames,tt));clock.textContent=tt.toFixed(2)+' s';}busy=false;}
+  scrub.oninput=()=>{stop();show(scrub.value/1000*dur);};
+  document.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>{stop();const t=r.phases[+b.dataset.jump].t;scrub.value=Math.round(t/dur*1000);show(t);cv.scrollIntoView({block:'center',behavior:'smooth'});});
+  function stop(){if(playing){playing=false;video.pause();play.textContent='Play at quarter speed';}}
+  function loop(){if(!playing)return;paint(cv,nearest(r.frames,video.currentTime));scrub.value=Math.round(video.currentTime/dur*1000);clock.textContent=video.currentTime.toFixed(2)+' s';if(video.ended||video.currentTime>=dur-0.04){stop();return;}requestAnimationFrame(loop);}
+  play.onclick=async()=>{if(playing){stop();return;}const first=r.phases[0].t,last=r.phases[r.phases.length-1].t;if(video.currentTime<first-0.5||video.currentTime>=last+0.3){await seek(Math.max(0,first-0.3));}
+    try{video.playbackRate=0.25;await video.play();playing=true;play.textContent='Pause';loop();}catch(e){}};
+  show(r.phases[Math.min(1,r.phases.length-1)].t);scrub.value=Math.round(r.phases[Math.min(1,r.phases.length-1)].t/dur*1000);
+}
+const EXAMPLE={cfg:{sport:'golf',club:'iron',view:'face',hand:'R',heightIn:70},
+  metrics:{tempo:3.9,shoulderTurn:78,hipTurnTop:44,shoulderTiltTop:30,headSwayTop:-2.6,hipOpenImpact:17,hipShiftImpact:0.4,shoulderTiltImpact:26,headImpact:-1.2,spineTiltAddr:4,leadArmTop:158},
+  info:{back:1.02,down:0.26}};
+
+/* history */
+function loadHistory(){try{return JSON.parse(localStorage.getItem('kc_history')||'[]');}catch(e){return [];}}
+function saveHistory(r){try{const h=loadHistory();h.unshift({ts:r.ts,cfg:r.cfg,metrics:r.metrics,info:r.info});localStorage.setItem('kc_history',JSON.stringify(h.slice(0,60)));}catch(e){}}
+function renderHistory(){const h=loadHistory(),ul=$('hist');
+  if(!h.length){ul.innerHTML='<li><span class="note">No sessions yet. Your reports show up here after you analyze a video.</span></li>';return;}
+  ul.innerHTML=h.map((r,i)=>{const g=KC.gradeAll(r.metrics,r.cfg),c=r.cfg;const d=new Date(r.ts);
+    return `<li><div><b>${NAMES[c.sport]}${c.sport==='golf'?', '+NAMES[c.club].toLowerCase():''}, ${NAMES[c.view].toLowerCase()}</b><br><span class="note">${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</span></div><div class="row"><span class="s">${g.score}</span><button class="btn small" type="button" data-open="${i}">Open</button></div></li>`;}).join('');
+  ul.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{const r=h[+b.dataset.open];current=null;location.hash='#analyze';renderReport({...r,phases:null,frames:null},false);});}
+$('hist-clear').onclick=()=>{try{localStorage.removeItem('kc_history');}catch(e){}renderHistory();};
+
+/* pro numbers */
+const PRO=[
+ {h:'Golf: tour swing numbers',rows:[
+  ['Tempo, backswing : downswing','3 : 1','Most common frame counts 21/7, 24/8, 27/9 at 30 fps','a'],
+  ['Shoulder turn at the top','90°','Tour average','b'],
+  ['Chest turn at the top','98° men, 102° women','Tour averages','c'],
+  ['Pelvis turn at the top','about 40°','Tour average','c'],
+  ['Shoulder tilt at the top','36°','High handicappers 29.6°','d'],
+  ['Hip turn at impact','36° open','High handicappers 19.5°','d'],
+  ['Pelvis and chest at impact','40° and 30° open','Hips lead the chest through the ball','c'],
+  ['Shoulder tilt at impact','39°','High handicappers 27.5°','d'],
+  ['Hip sway at the top','3.9 in toward target','High handicappers 2.55 in (tailbone reference)','d'],
+  ['Back bend at the finish','32°','High handicappers 3.2°','d'],
+  ['Chest side bend','15° at setup, over 30° at impact','Tour average','c']]},
+ {h:'Golf: one elite driver swing',note:'Rory McIlroy measured on a 3D system in 2019.',rows:[
+  ['Hip turn at the top','42°','','e'],['Shoulder turn at the top','about 116°','','e'],
+  ['Tilt away from target','13° at address, 34° at impact','','e'],['Clubhead speed','122 mph','98 mph with the shaft parallel on the way down','e']]},
+ {h:'Pitching: high-velocity and efficient deliveries',note:'Lab motion capture of adult pitchers. "Efficient" pitchers threw as hard with less load on the arm.',rows:[
+  ['Stride length','83 ± 4% of height','Pros with an open pelvis at plant: 81 ± 5%','f'],
+  ['Stride threshold','80% of height or more','About 2 mph per 10% of stride in 315 pros','h'],
+  ['Front knee bend at foot plant','43 ± 8°','','f'],
+  ['Front knee bend at release','35 ± 14°','','f'],
+  ['Front knee straightening, plant to release','33°','High-extension pros, at 409°/s against 187°/s','i'],
+  ['Pelvis open at foot plant','33 ± 11°','','f'],
+  ['Hip-to-shoulder separation at plant','53 ± 9°','Less efficient group 46 ± 9°','f'],
+  ['Elbow bend at foot plant','90 ± 9°','','f'],
+  ['Elbow height (shoulder abduction)','86 ± 11° at plant, about 90° at release','','f'],
+  ['Peak pelvis rotation speed','621 ± 86°/s','Less efficient group 535 ± 68°/s','f'],
+  ['Peak upper trunk rotation speed','1,155 ± 71°/s','Less efficient group 1,058 ± 72°/s','f'],
+  ['Maximum shoulder lay-back','189 ± 6°','Less efficient group 176 ± 9°','f'],
+  ['Forward trunk tilt at release','38 ± 6°','Less efficient group 33 ± 7°','f'],
+  ['Sideways trunk tilt at release','24 ± 11°','','f'],
+  ['Foot plant to release','0.145 s','','j']]}
+];
+const SRC={a:['Tour Tempo frame counts, The Golf Wire','https://thegolfwire.com/105752-2'],
+ b:['GolfTEC SwingTRU study, PGA.com','https://www.pga.com/archive/golftecs-swingtru-motion-study-illustrates-big-swing-differences-between'],
+ c:['Sportsbox AI tour ranges, Golf Digest','https://www.golfdigest.com/story/useful-golf-swingfacts-sportsbox-ai-graph'],
+ d:['GolfTEC study of 30,000 golfers, Golf Digest','https://www.golfdigest.com/story/swing-by-numbers-new-study-unlocks-6-swing-secrets'],
+ e:['GEARS 3D capture of Rory McIlroy, GOLF.com','https://golf.com/news/taylormade-3d-technology-reveals-the-secrets-to-rory-mcilroys-swing/'],
+ f:['ASMI: efficient and inefficient pitchers, ISBS proceedings','https://ojs.ub.uni-konstanz.de/cpa/article/view/3284/3085'],
+ h:['Stride length in 315 professional pitchers, Velo University summary','https://www.velouniversity.com/post/why-stride-length-might-be-the-most-underrated-variable-in-your-delivery'],
+ i:['Lead knee extension in professional pitchers, Velo University summary','https://www.velouniversity.com/post/lead-knee-extension-isnt-universal-why-structure-and-readiness-matter-more-than-the-pattern'],
+ j:['The kinetic chain in overhead pitching, Sports Health','https://pmc.ncbi.nlm.nih.gov/articles/PMC3445080']};
+(function renderPro(){const keys=Object.keys(SRC);
+  $('view-pro-numbers').innerHTML=PRO.map(s=>`<section class="card"><h2>${esc(s.h)}</h2>${s.note?`<p class="note">${esc(s.note)}</p>`:''}<div class="scroll"><table><thead><tr><th>Measure</th><th>Pro number</th><th>Context</th><th>Src</th></tr></thead><tbody>${s.rows.map(r=>`<tr><td>${esc(r[0])}</td><td class="num">${esc(r[1])}</td><td>${esc(r[2])}</td><td>${keys.indexOf(r[3])+1}</td></tr>`).join('')}</tbody></table></div></section>`).join('')+
+  `<section class="card"><h2>Sources</h2><ol class="tips" style="color:inherit">${keys.map(k=>`<li><a href="${SRC[k][1]}" target="_blank" rel="noopener">${esc(SRC[k][0])}</a></li>`).join('')}</ol><p class="note">Published lab studies report group averages, so these are the numbers of the hardest-throwing and most efficient groups, not of single named pitchers.</p></section>`;})();
+
+renderReport(EXAMPLE,true);showTab();
+getPose().then(()=>{$('trk').textContent='Body tracker: ready.';},()=>{$('trk').textContent='Body tracker: could not load in this viewer. Tell Claude "tracker blocked" and it will set the app up on free hosting instead.';});
+})();
+</script>
+</body>
+</html>
