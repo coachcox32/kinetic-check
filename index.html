@@ -112,6 +112,12 @@ select{background:var(--surface);border:1.5px solid var(--line);border-radius:8p
 .st-good .dot{background:var(--good)} .st-near .dot{background:var(--warn)} .st-bad .dot{background:var(--bad)}
 .more{padding:0 0 14px;font-size:14.5px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
 
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.tile{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.tile b{font-family:var(--display);font-weight:800;font-size:26px;line-height:1.05;font-variant-numeric:tabular-nums}
+.tile span{font-size:12.5px;color:var(--muted)}
+.tile.big b{font-size:44px;color:var(--accent)}
+input[type=number]{background:var(--surface);border:1.5px solid var(--line);border-radius:8px;padding:9px 10px;width:90px}
 .thumbs{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
 .thumbs button{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:0;overflow:hidden;cursor:pointer;display:flex;flex-direction:column}
 .thumbs img{width:100%;display:block;background:#000}
@@ -276,7 +282,7 @@ function analyzeGolf(frames,cfg){
   const ph=golfPhases(frames,unit),A=ph.addr,T=ph.top,I=ph.impact;
   const leg=near(frames,A,0.2,f=>(d2(f.lm[23],f.lm[25])+d2(f.lm[25],f.lm[27])+d2(f.lm[24],f.lm[26])+d2(f.lm[26],f.lm[28]))/2);
   const pxIn=(leg/0.49)/cfg.heightIn;
-  const sA=0.15,sT=0.03,sI=0.012,m={};
+  const sA=0.15,sT=0.03,sI=0.012,m={};let handMph=null;
   const headA=nearPt(frames,A,sA,head),hipA=nearPt(frames,A,sA,hipMid),hipI=nearPt(frames,I,sI,hipMid),headI=nearPt(frames,I,sI,head);
   if(ph.down>0.05)m.tempo=ph.back/ph.down;
   if(cfg.view==='face'){
@@ -294,6 +300,8 @@ function analyzeGolf(frames,cfg){
     m.hipShiftImpact=(hipI.x-hipA.x)*td/pxIn;
     m.spineTiltAddr=-near(frames,A,sA,lean)*td;
     m.leadArmTop=near(frames,T,sT,f=>joint(f,lead.sh,lead.el,lead.wr));
+    const hs=speeds(frames,frames.map(hands),unit);let mx=0;for(let i=T;i<=I;i++)mx=Math.max(mx,hs[i]);
+    handMph=mx*unit/pxIn/17.6;
   }else{
     const H=frames.map(hands),HA=nearPt(frames,A,sA,hands);
     const bd=Math.sign(HA.x-hipA.x)||1;
@@ -306,7 +314,7 @@ function analyzeGolf(frames,cfg){
     m.handPath=(xd-xb)*bd/pxIn;
   }
   return {metrics:m,phases:[{key:'address',label:'Address',t:frames[A].t},{key:'top',label:'Top',t:frames[T].t},{key:'impact',label:'Impact',t:frames[I].t},{key:'finish',label:'Finish',t:frames[ph.finish].t}],
-    info:{back:ph.back,down:ph.down}};
+    info:{back:ph.back,down:ph.down,handMph}};
 }
 
 function analyzePitch(frames,cfg){
@@ -511,7 +519,13 @@ function gradeAll(metrics,cfg){const ids=SETS[cfg.sport][cfg.view].filter(id=>id
   const score=rows.length?Math.round(rows.reduce((s,r)=>s+r.score,0)/rows.length):0;
   const prios=rows.filter(r=>r.status!=='good'&&DEFS[r.id][r.dir]&&DEFS[r.id][r.dir].tip).sort((a,b)=>a.score-b.score).slice(0,3);
   return {rows,score,prios};}
-root.KC={analyze,peakTime,gradeAll,DEFS,SETS,target};
+/* Rough ball-flight estimate from peak hand speed. Factors fit to published tour and amateur averages. */
+function golfSpeed(handMph,club){const k=club==='driver'?5.3:4.4,smash=club==='driver'?1.45:1.33;
+  const carry=b=>Math.max(0,club==='driver'?2.06*b-71:1.84*b-50);
+  const one=f=>{const c=handMph*k*f,b=c*smash;return {club:c,ball:b,carry:carry(b)};};
+  return {lo:one(0.88),mid:one(1),hi:one(1.12)};}
+function pitchVelo(dt,flightFt){const mph=t=>flightFt/t*0.6818/0.95;return {mid:mph(dt),lo:mph(dt+1/30),hi:dt>1/30+0.05?mph(dt-1/30):mph(dt)};}
+root.KC={analyze,peakTime,gradeAll,DEFS,SETS,target,golfSpeed,pitchVelo};
 })(typeof window!=='undefined'?window:globalThis);
 </script>
 
@@ -645,8 +659,9 @@ function renderReport(r,example){
   let h=`<section class="card"><div class="scorehead"><div class="score">${g.score}<small>/100</small></div><div class="scoremeta">${example?'<span class="tag">Example report</span>':''}<h2>${example?'What you will get':'Mechanics score'}</h2><p>${example?'Sample numbers for a mid-handicap iron swing. Record a video above to replace them with yours.':verdict}</p><div class="chips">${chips}</div></div></div>`;
   if(r.phases&&r.phases.length&&!example){h+=`<div class="thumbs">${r.phases.map((p,i)=>`<button type="button" data-jump="${i}"><img alt="${esc(p.label)} position" src="${p.img}"><span>${esc(p.label)}</span></button>`).join('')}</div>
     <div class="stage"><canvas id="review"></canvas></div><input type="range" id="scrub" min="0" max="1000" value="0" aria-label="Scrub through the video">
-    <div class="row"><button class="btn small" type="button" id="play">Play at quarter speed</button><span class="note" id="clock"></span></div>`;}
+    <div class="row"><button class="btn small" type="button" id="play">Play at quarter speed</button><button class="btn small" type="button" id="fr-b" aria-label="Back one step">&#9664; Step</button><button class="btn small" type="button" id="fr-f" aria-label="Forward one step">Step &#9654;</button><span class="note" id="clock"></span></div>`;}
   h+=`</section>`;
+  h+=analyticsCard(r,example);
   if(g.prios.length){h+=`<section class="card"><h2>Fix these first</h2><div class="prio">`+g.prios.map(p=>{const d=KC.DEFS[p.id],t=d[p.dir];
     return `<article class="${p.status==='near'?'near':''}"><h3>${esc(d.label)}</h3><p class="num">You: <b>${esc(fmtVal(p.id,p.value))}</b>. Pro range: ${esc(fmtRange(p.id,p.lo,p.hi))}.</p><p>${esc(t.tip)}</p>${t.drills.length?`<span class="eyebrow">Drills</span><ul>${t.drills.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}</article>`;}).join('')+`</div></section>`;}
   else if(g.rows.length){h+=`<section class="card"><h2>Nothing out of range</h2><p>Every number in this view sits in or near the pro range. Film the other angle to check the rest.</p></section>`;}
@@ -663,20 +678,55 @@ function renderReport(r,example){
   if(!example&&r.frames)wireReview(r);
   if(!example)$('report').scrollIntoView({block:'start',behavior:'smooth'});
 }
+const rng=(a,b,u)=>Math.round(a)+' to '+Math.round(b)+(u?' '+u:'');
+function analyticsCard(r,example){const c=r.cfg,i=r.info||{};
+  if(c.sport==='golf'){
+    if(c.view!=='face'||!(i.handMph>3))return `<section class="card"><h2>Speed and distance</h2><p>${c.view==='face'?'I could not read your hand speed from this clip.':'Film face-on to get speed and distance estimates. From behind, your hands move toward the camera and the speed reads far too low.'}</p></section>`;
+    const e=KC.golfSpeed(i.handMph,c.club);
+    return `<section class="card"><h2>Speed and distance</h2><div class="tiles">
+      <div class="tile"><b>${i.handMph.toFixed(1)} mph</b><span>Peak hand speed. PGA Tour average 20.8 with driver.</span></div>
+      <div class="tile"><b>${rng(e.lo.club,e.hi.club,'mph')}</b><span>Estimated club speed${c.club==='iron'?' (7-iron)':''}</span></div>
+      <div class="tile"><b>${rng(e.lo.ball,e.hi.ball,'mph')}</b><span>Estimated ball speed on a solid strike</span></div>
+      <div class="tile big"><b>${rng(e.lo.carry,e.hi.carry)}</b><span>Estimated carry, yards</span></div></div>
+      <p class="note">These are estimates worked out from how fast your hands move, not measurements of the ball. Hand speed explains most of the difference in club speed between golfers, but release and strike quality move the real number. Use it to track change from session to session.</p>
+      <p class="note">Spin cannot be read from body video; it takes a launch monitor that sees the ball. For reference, PGA Tour averages are about 2,545 rpm with driver and 7,124 rpm with a 7-iron.</p></section>`;}
+  if(example)return '';
+  const saved=i.velo?`<div class="tiles"><div class="tile big"><b>${Math.round(i.velo.mid)} mph</b><span>Release speed, likely ${rng(i.velo.lo,i.velo.hi,'mph')}</span></div></div>`:'';
+  if(!r.frames)return saved?`<section class="card"><h2>Pitch velocity</h2>${saved}</section>`:'';
+  return `<section class="card"><h2>Pitch velocity</h2><p class="note">Timed from the video: mark the frame where the ball leaves your hand and the frame where it reaches the catcher or target. Use the slider and Step buttons above. Works on regular video only, not slow-motion clips.</p>
+    <div class="row"><button class="btn small" type="button" id="mk-rel">Mark release</button><span class="note" id="t-rel"></span></div>
+    <div class="row"><button class="btn small" type="button" id="mk-arr">Mark ball arrival</button><span class="note" id="t-arr">not marked</span></div>
+    <div class="field"><label class="eyebrow" for="v-dist">Distance</label><div class="row"><select id="v-dist"><option value="60.5">Mound, 60 ft 6 in</option><option value="54">Mound, 54 ft</option><option value="50">Mound, 50 ft</option><option value="46">Mound, 46 ft</option><option value="c">Measured throw, feet</option></select><input type="number" id="v-ft" min="10" max="200" step="1" value="45" aria-label="Throw distance in feet" hidden></div></div>
+    <div id="v-out">${saved}</div></section>`;}
+function wireVelo(r,getT,jump){if(!$('mk-rel'))return;const dur=video.duration;let tr=r.phases[r.phases.length-1].t,ta=null;
+  const lab=()=>{$('t-rel').textContent='at '+tr.toFixed(2)+' s (auto-detected, adjust if needed)';$('t-arr').textContent=ta==null?'not marked':'at '+ta.toFixed(2)+' s';};
+  function calc(){lab();const out=$('v-out');if(ta==null)return;const dt=ta-tr;
+    if(!(dt>0.12&&dt<3)){out.innerHTML='<p class="note">Arrival has to come after release. Check both marks.</p>';return;}
+    const sel=$('v-dist').value;let ft;if(sel==='c'){ft=+$('v-ft').value;}else{ft=+sel-r.cfg.heightIn/12+2;}
+    if(!(ft>8)){out.innerHTML='<p class="note">Enter the throw distance in feet.</p>';return;}
+    const v=KC.pitchVelo(dt,ft);r.info.velo=v;
+    out.innerHTML=`<div class="tiles"><div class="tile big"><b>${Math.round(v.mid)} mph</b><span>Release speed, likely ${rng(v.lo,v.hi,'mph')}</span></div><div class="tile"><b>${dt.toFixed(2)} s</b><span>Flight time over about ${Math.round(ft)} ft</span></div></div><p class="note">Average speed over the flight, adjusted up 5% because a pitch loses about 10% of its speed on the way to the plate. One video frame either way changes the answer, so 60 frames per second gives a tighter range.</p>`;
+    try{const h=loadHistory();const k=h.findIndex(x=>x.ts===r.ts);if(k>=0){h[k].info=r.info;localStorage.setItem('kc_history',JSON.stringify(h));}}catch(e){}}
+  $('mk-rel').onclick=()=>{tr=getT();calc();};$('mk-arr').onclick=()=>{ta=getT();calc();};
+  $('v-dist').onchange=()=>{$('v-ft').hidden=$('v-dist').value!=='c';calc();};$('v-ft').oninput=calc;lab();}
 function wireReview(r){const cv=$('review'),scrub=$('scrub'),clock=$('clock'),play=$('play');if(!cv)return;
   cv.width=work.width;cv.height=work.height;const dur=video.duration;let busy=false,want=null,playing=false;
-  async function show(t){want=t;if(busy)return;busy=true;while(want!=null){const tt=want;want=null;await seek(tt);await raf();paint(cv,nearest(r.frames,tt));clock.textContent=tt.toFixed(2)+' s';}busy=false;}
+  let curT=0;
+  async function show(t){curT=t;want=t;if(busy)return;busy=true;while(want!=null){const tt=want;want=null;await seek(tt);await raf();paint(cv,nearest(r.frames,tt));clock.textContent=tt.toFixed(2)+' s';}busy=false;}
   scrub.oninput=()=>{stop();show(scrub.value/1000*dur);};
   document.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>{stop();const t=r.phases[+b.dataset.jump].t;scrub.value=Math.round(t/dur*1000);show(t);cv.scrollIntoView({block:'center',behavior:'smooth'});});
+  const step=d=>{stop();const t=Math.max(0,Math.min(dur-0.03,curT+d));scrub.value=Math.round(t/dur*1000);show(t);};
+  $('fr-b').onclick=()=>step(-1/60);$('fr-f').onclick=()=>step(1/60);
+  wireVelo(r,()=>curT,null);
   function stop(){if(playing){playing=false;video.pause();play.textContent='Play at quarter speed';}}
-  function loop(){if(!playing)return;paint(cv,nearest(r.frames,video.currentTime));scrub.value=Math.round(video.currentTime/dur*1000);clock.textContent=video.currentTime.toFixed(2)+' s';if(video.ended||video.currentTime>=dur-0.04){stop();return;}requestAnimationFrame(loop);}
+  function loop(){if(!playing)return;paint(cv,nearest(r.frames,video.currentTime));scrub.value=Math.round(video.currentTime/dur*1000);clock.textContent=video.currentTime.toFixed(2)+' s';curT=video.currentTime;if(video.ended||video.currentTime>=dur-0.04){stop();return;}requestAnimationFrame(loop);}
   play.onclick=async()=>{if(playing){stop();return;}const first=r.phases[0].t,last=r.phases[r.phases.length-1].t;if(video.currentTime<first-0.5||video.currentTime>=last+0.3){await seek(Math.max(0,first-0.3));}
     try{video.playbackRate=0.25;await video.play();playing=true;play.textContent='Pause';loop();}catch(e){}};
   show(r.phases[Math.min(1,r.phases.length-1)].t);scrub.value=Math.round(r.phases[Math.min(1,r.phases.length-1)].t/dur*1000);
 }
 const EXAMPLE={cfg:{sport:'golf',club:'iron',view:'face',hand:'R',heightIn:70},
   metrics:{tempo:3.9,shoulderTurn:78,hipTurnTop:44,shoulderTiltTop:30,headSwayTop:-2.6,hipOpenImpact:17,hipShiftImpact:0.4,shoulderTiltImpact:26,headImpact:-1.2,spineTiltAddr:4,leadArmTop:158},
-  info:{back:1.02,down:0.26}};
+  info:{back:1.02,down:0.26,handMph:16.4}};
 
 /* history */
 function loadHistory(){try{return JSON.parse(localStorage.getItem('kc_history')||'[]');}catch(e){return [];}}
@@ -705,6 +755,14 @@ const PRO=[
  {h:'Golf: one elite driver swing',note:'Rory McIlroy measured on a 3D system in 2019.',rows:[
   ['Hip turn at the top','42°','','e'],['Shoulder turn at the top','about 116°','','e'],
   ['Tilt away from target','13° at address, 34° at impact','','e'],['Clubhead speed','122 mph','98 mph with the shaft parallel on the way down','e']]},
+ {h:'Golf: speed, distance and spin',note:'Launch monitor averages.',rows:[
+  ['PGA Tour driver','115 mph club, 171 mph ball','2,545 rpm spin, 282 yd carry','k'],
+  ['PGA Tour 7-iron','92 mph club, 123 mph ball','7,124 rpm spin, 176 yd carry','k'],
+  ['LPGA Tour driver','96 mph club, 143 mph ball','2,506 rpm spin, 223 yd carry','l'],
+  ['Peak hand speed, driver','PGA Tour 20.8 mph','Handicap 1 to 9: 16.8. Handicap 10 to 19: 15.8','m']]},
+ {h:'Pitching: ball flight',rows:[
+  ['Release point','6.4 ft in front of the rubber','MLB average, so the ball travels just over 54 ft','n'],
+  ['Speed lost on the way to the plate','about 10%','A little more for the hardest fastballs','o']]},
  {h:'Pitching: high-velocity and efficient deliveries',note:'Lab motion capture of adult pitchers. "Efficient" pitchers threw as hard with less load on the arm.',rows:[
   ['Stride length','83 ± 4% of height','Pros with an open pelvis at plant: 81 ± 5%','f'],
   ['Stride threshold','80% of height or more','About 2 mph per 10% of stride in 315 pros','h'],
@@ -730,7 +788,12 @@ const SRC={a:['Tour Tempo frame counts, The Golf Wire','https://thegolfwire.com/
  f:['ASMI: efficient and inefficient pitchers, ISBS proceedings','https://ojs.ub.uni-konstanz.de/cpa/article/view/3284/3085'],
  h:['Stride length in 315 professional pitchers, Velo University summary','https://www.velouniversity.com/post/why-stride-length-might-be-the-most-underrated-variable-in-your-delivery'],
  i:['Lead knee extension in professional pitchers, Velo University summary','https://www.velouniversity.com/post/lead-knee-extension-isnt-universal-why-structure-and-readiness-matter-more-than-the-pattern'],
- j:['The kinetic chain in overhead pitching, Sports Health','https://pmc.ncbi.nlm.nih.gov/articles/PMC3445080']};
+ j:['The kinetic chain in overhead pitching, Sports Health','https://pmc.ncbi.nlm.nih.gov/articles/PMC3445080'],
+ k:['Trackman PGA Tour averages, Golf Monthly','https://www.golfmonthly.com/tour/how-far-pga-tour-players-hit-every-club-in-the-bag'],
+ l:['Trackman LPGA Tour averages, Golf Monthly','https://golfmonthly.com/features/the-game/how-far-lpga-tour-players-hit-every-club-in-the-bag'],
+ m:['Hand speed by skill level, deWiz','https://ch.dewizgolf.com/pages/what-is-good-hand-speed-in-golf'],
+ n:['Release extension, MLB.com','https://www.mlb.com/news/jacob-misiorowski-elite-velocity-extension'],
+ o:['Velocity loss in flight, Baseball Prospectus','https://www.baseballprospectus.com/?p=6291']};
 (function renderPro(){const keys=Object.keys(SRC);
   $('view-pro-numbers').innerHTML=PRO.map(s=>`<section class="card"><h2>${esc(s.h)}</h2>${s.note?`<p class="note">${esc(s.note)}</p>`:''}<div class="scroll"><table><thead><tr><th>Measure</th><th>Pro number</th><th>Context</th><th>Src</th></tr></thead><tbody>${s.rows.map(r=>`<tr><td>${esc(r[0])}</td><td class="num">${esc(r[1])}</td><td>${esc(r[2])}</td><td>${keys.indexOf(r[3])+1}</td></tr>`).join('')}</tbody></table></div></section>`).join('')+
   `<section class="card"><h2>Sources</h2><ol class="tips" style="color:inherit">${keys.map(k=>`<li><a href="${SRC[k][1]}" target="_blank" rel="noopener">${esc(SRC[k][0])}</a></li>`).join('')}</ol><p class="note">Published lab studies report group averages, so these are the numbers of the hardest-throwing and most efficient groups, not of single named pitchers.</p></section>`;})();
